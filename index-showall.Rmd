@@ -1,0 +1,78 @@
+---
+title: 'Motor Trend: The Effect of Transmission Types on MPG'
+author: "James Brink"
+date: "October 24th, 2014"
+output: pdf_document
+keep_md: yes
+---
+####Executive Summary
+In this analysis we explore the data we collected from our 1974 road tests.  We tested 32 different cars and recorded their fuel consumption as well as 10 different aspects of their design.  Our goal is to explore the relationship between these 10 aspects of automobile design and fuel consumption (miles per gallon or mpg).  On a more granular level we wanted to show the effects, if any, that an automatic transmission had on mpg when compared to a manual transmission.  Futhermore we aimed to quantify any mpg differences between the transmission types.  
+  
+After performing our analysis we found that after adjusting for weight, number of cylinders, and horsepower, that cars with manual transmission tend to have higher mpg.
+
+####Loading and processing the data
+First we load in the mtcars dataset from the datasets package.  We assign the dataset to the variable 'data'. Next we convert am (transmission type), cyl (number of cylinders), vs (V or straight cylinder arrangment), gear (number of gears), and carb (number of carburetors) to factor variables.  After that we rename the levels on am so they are easier to work with.
+```{r}
+library(datasets)
+set.seed(123)
+data <- mtcars
+data$am <- factor(data$am)
+data$cyl <- factor(data$cyl)
+data$vs <- factor(data$vs)
+data$gear <- factor(data$gear)
+data$carb <- factor(data$carb)
+levels(data$am) <- c("Auto", "Man")
+```
+####Exploratory Data Analysis
+We created a scatterplot matrix which plotted the relatioships between all the variables in our dataset.  You can view this figure (Figure 1) in the appendix.  There appears to be relationships between mpg and cyl, disp, hp, drat, wt, and qsec.  This shouldn't be unexpected.  Logically we would expect these variables to effect mpg since they are measures of engine size, engine power, and vehicle weight.  The remaining varables, vs, am, gear, and carb may have a relationship with mpg but it is tough to see because they are all factor variables with only a few levels.  We will have to do further testing to determine which variables we want to include in our model.  
+
+####Model Fitting
+To help us figure out which variables to include in our model we used a stepwise alogrithm to do reduce the number of variables down to those that provide us with an optimal model.  This function starts by including all the variables and then removes one at a time to determine what regressors we should include in an optimal model.
+```{r results='hide'}
+fit <- lm(mpg ~ ., data = data)
+optFit <- step(fit, direction = "backward")
+```
+```{r}
+optFit$call
+optFit$coeff
+```
+The model returned includes cyl, hp, wt, and am.  The adjusted R-squared is `r round(summary(optFit)$adj.r.squared,2)` meaning it explains `r round(summary(optFit)$adj.r.squared,2)*100`% of the variability in mpg.  We can interpret the coefficients in the model as an increase from 4 cylinders to 6 causes a 3.03 drop in mpg and increasing from 6 cylnders to 8 drops causes a further 2.16 drop in mpg.  We also see that an increase in horsepower causes a drop of 3.2 mpg for every 100hp and that weight causes a 2.50 drop in mpg for every additional 1000 pounds.  Finally we see that a change from an automatic transmission to a manual transmission increased mpg by 1.81.
+  
+Since we are ultimately trying to show the relationship between am and mpg we should compare this model to a single variable model with just am to see if the inclusion of these regressors do in-fact create a better model.  Also, intuitively one would think that disp and qsec might be useful to our model since they represent engine size and engine power, which we typcially associate with lower mpg so we will aslo compare our optimal model to a model including all the regressors in the optimal model as well as qsec and disp.
+```{r}
+singleFit <- lm(mpg ~ am, data=data)
+optPlusFit <- lm(mpg ~ cyl + hp + wt + am + qsec + disp, data=data)
+anova(singleFit, optFit, optPlusFit)
+```
+We observe a very small P value for the optimal model vs. the single variable model.  However, for the optimal model plus disp and qsec vs the optimal model we see a relatively large P value meaning that the added regressors do not provide any improvement to the optimal model.
+
+####Residuals and Diagnostics
+Residuals were plotted for the optimal model and can be found in Figure 2 of the appendix.  The first plot, Residuals vs. Fitted, seems to show no relationship in the residuals meaning that we can verify independence.  The second plot, Normal Q-Q shows us that our residuals are normally distributed.  The third plot, Scale-Location shows no pattern in the variance of our residuals, meaning that variance is relatively constant.  Finally, the fourth plot, Residuals vs. Leverage, shows us the leverage of the different data points, we see that the all but one of the datapoints is within two standard deviations.
+
+
+####Uncertainty
+```{r}
+test <- t.test(mpg~am, data=data)
+test
+val <- test$p.value
+```
+Before we draw conclusions about transmission types on mpg we must test to make sure that the difference in mpg for automatic and manual transmissions are actually different.  We accomplished this with a simple t test which returned a P value of `r round(val, 4)` which is small enough to reject the null hypothesis that the mean mpg for manual and automatic transmissions is the same. 
+
+
+####Conclusion
+In conclusion we see that our model is valid and we can use our coefficients to correctly identify the relationships between the variables in our model and mpg.  As we set out to do initially we can not only show that cars with manual transmissions have a higher mpg than those with automatic, but we can also quantify that as 1.81 mpg.
+  
+
+#####Figure 1
+Scatterplot Matrix  
+```{r echo=FALSE, fig.height=9}
+pairs(data)
+```
+
+#####Figure 2
+Residuals and Diagnostics  
+```{r echo=FALSE, fig.height=6}
+par(mfrow=c(2,2))
+plot(optFit)
+par(mfrow=c(1,1))
+```
